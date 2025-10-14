@@ -1,0 +1,35 @@
+# PlatformIO
+.pio/
+.vscode/
+lib/readme.txt
+
+# Configuration files (contains sensitive data)
+include/config.h
+
+# Build artifacts
+*.bin
+*.elf
+*.map
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*~
+*.tmp
+*.swp
+
+# Node modules (if using web interface)
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
