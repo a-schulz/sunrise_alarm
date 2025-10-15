@@ -3,6 +3,9 @@
 #include <ArduinoJson.h>
 #include <FastLED.h>
 #include <time.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoOTA.h>
 #include "config.h"
 
 // LED strip
@@ -10,6 +13,36 @@ CRGB leds[NUM_LEDS];
 
 // Supabase client
 Supabase db;
+
+// Web server and OTA
+AsyncWebServer server(WEB_SERVER_PORT);
+
+// Web logging system
+#if ENABLE_WEB_LOGS
+String logBuffer[MAX_LOG_ENTRIES];
+int logIndex = 0;
+bool logBufferFull = false;
+
+void webLog(String message) {
+  String timestamp = "";
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    char timeStr[20];
+    strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+    timestamp = String(timeStr) + " ";
+  }
+  
+  logBuffer[logIndex] = timestamp + message;
+  logIndex = (logIndex + 1) % MAX_LOG_ENTRIES;
+  if (logIndex == 0) logBufferFull = true;
+  
+  Serial.println(message); // Also print to serial
+}
+
+#define WEB_LOG(x) webLog(x)
+#else
+#define WEB_LOG(x) DEBUG_PRINTLN(x)
+#endif
 
 // RTC memory to persist data across deep sleep
 RTC_DATA_ATTR int bootCount = 0;
@@ -103,6 +136,8 @@ ColorPreset colorPresets[] = {
 
 // Function declarations
 void connectToWiFi();
+void setupOTA();
+void setupWebServer();
 void syncTime();
 void fetchAlarms();
 void parseAlarms(String jsonResponse);
@@ -125,9 +160,8 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   
-  DEBUG_PRINTLN("=== Sunrise Alarm Clock Starting ===");
-  DEBUG_PRINT("Boot count: ");
-  DEBUG_PRINTLN(++bootCount);
+  WEB_LOG("=== Sunrise Alarm Clock Starting ===");
+  WEB_LOG("Boot count: " + String(++bootCount));
 
   // Initialize LED strip
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
@@ -140,6 +174,12 @@ void setup() {
 
   // Connect to WiFi
   connectToWiFi();
+  
+  // Setup OTA updates
+  setupOTA();
+  
+  // Setup web server for logs and control
+  setupWebServer();
 
   // Initialize Supabase
   db.begin(SUPABASE_URL, SUPABASE_KEY);
@@ -164,8 +204,17 @@ void setup() {
 }
 
 void loop() {
-  // This should never be reached due to deep sleep
-  delay(1000);
+  // Handle OTA updates
+  ArduinoOTA.handle();
+  
+  // Keep web server responsive during non-sleep periods
+  delay(100);
+  
+  // If we're here, something prevented deep sleep (like OTA mode)
+  // Check for button press to manually trigger sync or test
+  if (buttonPressed) {
+    handleButtonPress();
+  }
 }
 
 void setupButton() {
@@ -221,6 +270,159 @@ void connectToWiFi() {
   }
 }
 
+void setupOTA() {
+  WEB_LOG("Setting up ArduinoOTA updates...");
+  
+  ArduinoOTA.setHostname(OTA_HOSTNAME);
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+  
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_SPIFFS
+      type = "filesystem";
+    }
+    WEB_LOG("OTA Start updating " + type);
+    // Turn off LEDs during update
+    FastLED.clear();
+    FastLED.show();
+  });
+  
+  ArduinoOTA.onEnd([]() {
+    WEB_LOG("OTA Update completed");
+  });
+  
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    // Show progress with LEDs
+    int ledProgress = (progress * NUM_LEDS) / total;
+    FastLED.clear();
+    for (int i = 0; i < ledProgress; i++) {
+      leds[i] = CRGB::Blue;
+    }
+    FastLED.show();
+  });
+  
+  ArduinoOTA.onError([](ota_error_t error) {
+    String errorMsg = "OTA Error[" + String(error) + "]: ";
+    if (error == OTA_AUTH_ERROR) errorMsg += "Auth Failed";
+    else if (error == OTA_BEGIN_ERROR) errorMsg += "Begin Failed";
+    else if (error == OTA_CONNECT_ERROR) errorMsg += "Connect Failed";
+    else if (error == OTA_RECEIVE_ERROR) errorMsg += "Receive Failed";
+    else if (error == OTA_END_ERROR) errorMsg += "End Failed";
+    WEB_LOG(errorMsg);
+    
+    // Flash red LEDs to indicate error
+    for (int i = 0; i < 3; i++) {
+      fill_solid(leds, NUM_LEDS, CRGB::Red);
+      FastLED.show();
+      delay(200);
+      FastLED.clear();
+      FastLED.show();
+      delay(200);
+    }
+  });
+  
+  ArduinoOTA.begin();
+  WEB_LOG("OTA Ready - Use Arduino IDE or platformio for updates");
+  WEB_LOG("OTA Hostname: " + String(OTA_HOSTNAME) + ", Password: " + String(OTA_PASSWORD));
+}
+
+void setupWebServer() {
+  WEB_LOG("Setting up web server...");
+  
+  // Main dashboard
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String html = "<!DOCTYPE html><html><head><title>Sunrise Alarm</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<style>body{font-family:Arial;margin:20px;background:#f0f0f0}";
+    html += ".card{background:white;padding:20px;margin:10px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
+    html += ".btn{background:#007bff;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;margin:5px}";
+    html += ".btn:hover{background:#0056b3}";
+    html += ".status{padding:10px;border-radius:4px;margin:10px 0}";
+    html += ".success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}";
+    html += ".info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}</style></head><body>";
+    
+    html += "<h1>🌅 Sunrise Alarm Control</h1>";
+    
+    // Status card
+    html += "<div class='card'><h2>System Status</h2>";
+    html += "<div class='status info'>Device: " + String(OTA_HOSTNAME) + "</div>";
+    html += "<div class='status info'>IP: " + WiFi.localIP().toString() + "</div>";
+    html += "<div class='status info'>MAC: " + WiFi.macAddress() + "</div>";
+    
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char timeStr[64];
+      strftime(timeStr, sizeof(timeStr), "%A, %B %d %Y %H:%M:%S", &timeinfo);
+      html += "<div class='status success'>Time: " + String(timeStr) + "</div>";
+    }
+    
+    html += "<div class='status info'>Boot Count: " + String(bootCount) + "</div>";
+    html += "<div class='status info'>Free Heap: " + String(ESP.getFreeHeap()) + " bytes</div>";
+    html += "</div>";
+    
+    // Control buttons
+    html += "<div class='card'><h2>Controls</h2>";
+    html += "<button class='btn' onclick=\"location.href='/logs'\">📋 View Logs</button>";
+    html += "<button class='btn' onclick=\"location.href='/test'\">🌈 Test LEDs</button>";
+    html += "<button class='btn' onclick=\"location.href='/sync'\">🔄 Sync Alarms</button>";
+    html += "<button class='btn' onclick=\"location.href='/update'\">⬆️ OTA Update</button>";
+    html += "</div>";
+    
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+  
+  // Logs page with auto-refresh
+  server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String html = "<!DOCTYPE html><html><head><title>System Logs</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<meta http-equiv='refresh' content='5'>";
+    html += "<style>body{font-family:monospace;margin:20px;background:#000;color:#0f0}";
+    html += ".log{padding:2px 0;border-bottom:1px solid #333}</style></head><body>";
+    html += "<h2>📋 System Logs (Auto-refresh: 5s)</h2>";
+    html += "<a href='/' style='color:#0ff'>← Back to Dashboard</a><br><br>";
+    
+    int startIndex = logBufferFull ? logIndex : 0;
+    int count = logBufferFull ? MAX_LOG_ENTRIES : logIndex;
+    
+    for (int i = 0; i < count; i++) {
+      int idx = (startIndex + i) % MAX_LOG_ENTRIES;
+      html += "<div class='log'>" + logBuffer[idx] + "</div>";
+    }
+    
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+  
+  // LED test endpoint
+  server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request) {
+    WEB_LOG("LED test triggered via web");
+    
+    // Rainbow test
+    for (int hue = 0; hue < 256; hue += 4) {
+      fill_rainbow(leds, NUM_LEDS, hue, 256/NUM_LEDS);
+      FastLED.show();
+      delay(50);
+    }
+    FastLED.clear();
+    FastLED.show();
+    
+    request->send(200, "text/plain", "LED test completed!");
+  });
+  
+  // Manual sync endpoint
+  server.on("/sync", HTTP_GET, [](AsyncWebServerRequest *request) {
+    WEB_LOG("Manual sync triggered via web");
+    fetchAlarms();
+    request->send(200, "text/plain", "Alarm sync completed!");
+  });
+  
+  server.begin();
+  WEB_LOG("Web server started on http://" + WiFi.localIP().toString());
+}
+
 void syncTime() {
   DEBUG_PRINTLN("Syncing time with NTP server...");
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
@@ -262,7 +464,7 @@ void fetchAlarms() {
 }
 
 void parseAlarms(String jsonResponse) {
-  JsonDocument doc;
+  DynamicJsonDocument doc(4096); // Allocate 4KB for JSON parsing
   DeserializationError error = deserializeJson(doc, jsonResponse);
   
   if (error) {

@@ -163,6 +163,107 @@ The ESP32's built-in BOOT button (GPIO0) provides manual sync functionality:
 - **Wake from sleep**: Button press will wake the device from deep sleep
 - **Debouncing**: Built-in 50ms debounce prevents false triggers
 
+## 📱 Web Interface & Remote Access
+
+### Accessing the Web Dashboard
+
+Once your ESP32 is connected to WiFi, you can access the web interface:
+
+1. **Find the IP address**: Check your router's admin panel or use a network scanner
+2. **Open browser**: Navigate to `http://<ESP32_IP_ADDRESS>` 
+3. **Alternative**: Use the hostname `http://sunrise-alarm.local` (if mDNS is supported)
+
+### Web Interface Features
+
+| Page | URL | Description |
+|------|-----|-------------|
+| **Dashboard** | `/` | System status, controls, device info |
+| **Live Logs** | `/logs` | Real-time system logs with auto-refresh |
+| **LED Test** | `/test` | Rainbow LED test animation |
+| **Manual Sync** | `/sync` | Force alarm synchronization |
+
+### Real-Time Logging
+
+The device provides comprehensive web-based logging:
+
+- **Auto-refresh**: Logs page refreshes every 5 seconds
+- **Persistent storage**: Last 100 log entries retained in memory
+- **Timestamps**: All logs include precise timestamps
+- **Multiple sources**: Boot events, WiFi status, alarm triggers, errors
+
+**Access logs via**: `http://<ESP32_IP>/logs`
+
+Example log output:
+```
+07:30:15 === Sunrise Alarm Clock Starting ===
+07:30:16 Boot count: 1
+07:30:17 WiFi connected! IP: 192.168.1.100
+07:30:18 OTA Ready - Use Arduino IDE or platformio for updates
+07:30:19 Web server started on http://192.168.1.100
+07:30:20 Alarms fetched successfully
+07:30:21 Total alarms loaded: 3
+```
+
+## 🔄 Over-The-Air (OTA) Updates
+
+### Setup OTA Development Environment
+
+1. **Configure PlatformIO** (add to `platformio.ini`):
+   ```ini
+   upload_protocol = espota
+   upload_port = <ESP32_IP_ADDRESS>
+   upload_flags = 
+       --port=3232
+       --auth=sunrise2024
+   ```
+
+2. **Update via PlatformIO**:
+   ```bash
+   # Upload new firmware wirelessly
+   pio run -t upload
+   
+   # Monitor logs during update
+   pio device monitor
+   ```
+
+### Arduino IDE OTA Setup
+
+1. **Install ESP32 OTA library** (usually included)
+2. **Select network port**:
+   - Tools → Port → Network Ports → `sunrise-alarm at <IP>`
+3. **Upload sketch** normally - it will upload via WiFi
+
+### OTA Security & Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Hostname** | `sunrise-alarm` | Network device name |
+| **Password** | `sunrise2024` | OTA authentication |
+| **Port** | `3232` | Standard ESP32 OTA port |
+
+### OTA Update Process
+
+1. **Visual feedback**: LEDs show upload progress (blue bar)
+2. **Automatic restart**: Device reboots after successful update
+3. **Error handling**: Red LED flashes indicate update failure
+4. **Rollback safety**: Previous firmware preserved on failure
+
+### OTA Troubleshooting
+
+**Device Not Found:**
+- Ensure ESP32 and computer are on same network
+- Check firewall settings (allow port 3232)
+- Verify device hostname in network
+
+**Authentication Failed:**
+- Confirm OTA password matches `config.h`
+- Try uploading via USB once to reset OTA settings
+
+**Upload Timeout:**
+- Device may be in deep sleep - press BOOT button to wake
+- Check network stability and signal strength
+- Increase upload timeout in IDE settings
+
 ## 🔄 Power Management
 
 The ESP32 uses intelligent power management:
@@ -172,7 +273,16 @@ The ESP32 uses intelligent power management:
 - **Wake sources**: 
   - Timer interrupt for next alarm check
   - BOOT button press for manual sync
+  - **OTA mode**: Prevents sleep when updates are available
 - **Battery life**: Weeks to months depending on LED usage
+
+### Development Mode
+
+For development and debugging, you can prevent deep sleep:
+
+1. **Serial monitor active**: Device stays awake when connected to USB
+2. **Web interface open**: Periodic requests keep device active
+3. **OTA mode**: Device remains awake for 5 minutes after boot for updates
 
 ## 🎨 Color Presets
 
@@ -240,6 +350,18 @@ VALUES ('YOUR_ESP32_MAC', '07:00:00', ARRAY[1,2,3,4,5], 255, 30, 'sunrise');
 - Check `BUTTON_PIN` configuration
 - Verify debounce timing
 
+**OTA Updates Failing:**
+- Device must be awake (press BOOT button or access web interface)
+- Check network connectivity and firewall settings
+- Verify OTA password matches configuration
+- Try USB upload first to reset OTA credentials
+
+**Web Interface Not Accessible:**
+- Check device IP address in router admin panel
+- Ensure device and computer on same network
+- Try `http://sunrise-alarm.local` if mDNS is available
+- Access logs via serial monitor if web fails
+
 ### Debug Mode
 
 Enable detailed logging by setting `DEBUG_MODE 1` in `config.h`:
@@ -249,6 +371,16 @@ Enable detailed logging by setting `DEBUG_MODE 1` in `config.h`:
 ```
 
 Monitor serial output at 115200 baud for troubleshooting information.
+
+### Remote Debugging
+
+When away from the device, use the web interface:
+
+1. **Check status**: Access dashboard for system health
+2. **Monitor logs**: Use auto-refreshing logs page
+3. **Force sync**: Trigger manual alarm sync
+4. **Test hardware**: Run LED test animation
+5. **Update firmware**: Upload fixes via OTA
 
 ## 🔄 Development Workflow
 
