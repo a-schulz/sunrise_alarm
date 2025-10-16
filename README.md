@@ -163,6 +163,103 @@ The ESP32's built-in BOOT button (GPIO0) provides manual sync functionality:
 - **Wake from sleep**: Button press will wake the device from deep sleep
 - **Debouncing**: Built-in 50ms debounce prevents false triggers
 
+## 🔄 Over-The-Air (OTA) Updates
+
+### ⚠️ Important: OTA Availability
+
+**OTA updates are ONLY available in these scenarios:**
+
+| **Scenario** | **OTA Available** | **How to Activate** |
+|--------------|-------------------|---------------------|
+| **Initial Startup** | ✅ Yes | First boot after power on or reset |
+| **Button Wake** | ✅ Yes | Press BOOT button to wake from sleep |
+| **Deep Sleep Wake** | ❌ No | Device goes straight back to sleep |
+
+**Why this design?**
+- **Battery efficiency**: Deep sleep wakes are frequent (every hour) - enabling OTA would drain battery
+- **Predictable updates**: You know exactly when OTA is available
+- **Development friendly**: Button press gives you OTA access anytime
+
+### How to Perform OTA Updates
+
+#### Method 1: Initial Boot (Easiest)
+1. **Power cycle the device** (unplug and plug back in, or press EN/RST button)
+2. **Wait for WiFi connection** (check blue LED flash every 10 seconds)
+3. **Upload firmware** within the OTA window
+4. Device reboots and applies update
+
+#### Method 2: Button Wake (Most Convenient)
+1. **Press BOOT button** to wake device from sleep
+2. **Blue LED flashes** indicate device is awake and OTA-ready
+3. **Upload firmware** via PlatformIO or Arduino IDE
+4. Update completes and device reboots
+
+### Visual Status Indicators
+
+When OTA is available:
+- **Blue LED flash** every 10 seconds on first LED
+- **Web interface accessible** at `http://<IP>`
+- **Serial logs** show "Device awake - Ready for OTA updates"
+
+### OTA Update Process
+
+**PlatformIO:**
+```bash
+# After first USB upload, configure platformio.ini:
+# upload_protocol = espota
+# upload_port = <ESP32_IP_ADDRESS>
+
+# Then upload wirelessly:
+pio run -t upload
+```
+
+**Arduino IDE:**
+1. Tools → Port → Network Ports → `sunrise-alarm at <IP>`
+2. Upload sketch normally
+
+**During upload:**
+- LEDs show **blue progress bar** across the strip
+- Upload takes 20-30 seconds typically
+- Device automatically reboots on success
+- **Red flashing LEDs** indicate upload error
+
+### OTA Configuration
+
+| Setting | Value | Location |
+|---------|-------|----------|
+| **Hostname** | `sunrise-alarm` | `config.h` → `OTA_HOSTNAME` |
+| **Password** | `sunrise2024` | `config.h` → `OTA_PASSWORD` |
+| **Port** | `3232` | Standard ArduinoOTA port |
+
+### OTA Troubleshooting
+
+**"Device not found" error:**
+- Device is in deep sleep - press BOOT button to wake
+- Check device and computer are on same network
+- Verify IP address hasn't changed (check router)
+
+**"Auth Failed" error:**
+- OTA password mismatch
+- Check `config.h` has correct `OTA_PASSWORD`
+- Re-upload via USB once to reset credentials
+
+**Upload timeout:**
+- WiFi connection unstable
+- Device went to sleep during upload (shouldn't happen with button wake)
+- Try power cycling and uploading immediately
+
+### Development Workflow
+
+**For active development:**
+1. Keep USB connected - serial monitor prevents sleep
+2. Press BOOT button when needed for wireless updates
+3. Use web interface for remote debugging
+
+**For production use:**
+1. Power cycle or button press for updates
+2. Device sleeps between alarms for battery efficiency
+3. Web logs available during OTA window
+
 ## 📱 Web Interface & Remote Access
 
 ### Accessing the Web Dashboard
@@ -203,66 +300,6 @@ Example log output:
 07:30:20 Alarms fetched successfully
 07:30:21 Total alarms loaded: 3
 ```
-
-## 🔄 Over-The-Air (OTA) Updates
-
-### Setup OTA Development Environment
-
-1. **Configure PlatformIO** (add to `platformio.ini`):
-   ```ini
-   upload_protocol = espota
-   upload_port = <ESP32_IP_ADDRESS>
-   upload_flags = 
-       --port=3232
-       --auth=sunrise2024
-   ```
-
-2. **Update via PlatformIO**:
-   ```bash
-   # Upload new firmware wirelessly
-   pio run -t upload
-   
-   # Monitor logs during update
-   pio device monitor
-   ```
-
-### Arduino IDE OTA Setup
-
-1. **Install ESP32 OTA library** (usually included)
-2. **Select network port**:
-   - Tools → Port → Network Ports → `sunrise-alarm at <IP>`
-3. **Upload sketch** normally - it will upload via WiFi
-
-### OTA Security & Configuration
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| **Hostname** | `sunrise-alarm` | Network device name |
-| **Password** | `sunrise2024` | OTA authentication |
-| **Port** | `3232` | Standard ESP32 OTA port |
-
-### OTA Update Process
-
-1. **Visual feedback**: LEDs show upload progress (blue bar)
-2. **Automatic restart**: Device reboots after successful update
-3. **Error handling**: Red LED flashes indicate update failure
-4. **Rollback safety**: Previous firmware preserved on failure
-
-### OTA Troubleshooting
-
-**Device Not Found:**
-- Ensure ESP32 and computer are on same network
-- Check firewall settings (allow port 3232)
-- Verify device hostname in network
-
-**Authentication Failed:**
-- Confirm OTA password matches `config.h`
-- Try uploading via USB once to reset OTA settings
-
-**Upload Timeout:**
-- Device may be in deep sleep - press BOOT button to wake
-- Check network stability and signal strength
-- Increase upload timeout in IDE settings
 
 ## 🔄 Power Management
 
