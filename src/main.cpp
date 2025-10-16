@@ -53,7 +53,7 @@ RTC_DATA_ATTR uint64_t nextAlarmTime = 0;
 RTC_DATA_ATTR bool wasButtonWake = false; // Track if woken by button
 
 // Timing constants for OTA accessibility
-#define OTA_WINDOW_DURATION 60000 // 1 minute in milliseconds
+#define OTA_WINDOW_DURATION 300000 // 5 minutes in milliseconds
 
 // Button variables
 volatile bool buttonPressed = false;
@@ -169,6 +169,7 @@ bool serialConnected();
 bool recentWebActivity();
 void trackWebActivity();
 void initializeLEDs();
+void showStatusIndicator();
 
 void setup()
 {
@@ -190,14 +191,8 @@ void setup()
   connectToWiFi();
 
   // Setup OTA updates
-  if (bootCount == 1 || wasButtonWake)
-  {
-    setupOTA();
-    otaEnabled = true;
-
-    // Setup web server for logs and control
-    setupWebServer();
-  }
+  setupOTA();
+  setupWebServer();
 
   // Initialize Supabase
   db.begin(SUPABASE_URL, SUPABASE_KEY);
@@ -218,45 +213,34 @@ void setup()
   }
 
   // Determine if we should stay awake or sleep
-  if (otaEnabled)
-  {
-    WEB_LOG("Staying awake for OTA/development window");
-  }
-  else
+  if (!shouldStayAwake())
   {
     // Calculate next wake time and go to deep sleep
     calculateNextWakeTime();
     enterDeepSleep();
   }
+
+  WEB_LOG("Staying awake for OTA/maintenance window");
 }
 
 bool shouldStayAwake()
 {
   // Stay awake if OTA is enabled
-  if (otaEnabled && millis() - bootTime < OTA_WINDOW_DURATION)
+  if (millis() - bootTime < OTA_WINDOW_DURATION)
   {
-    WEB_LOG("In OTA maintenance window (" + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + "s remaining)");
-    return true;
-  }
-
-  // Stay awake if serial monitor is connected (development mode)
-  if (serialConnected())
-  {
-    WEB_LOG("Serial connection detected - staying awake for development");
+    WEB_LOG("Staying awake for OTA window for next " + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + " seconds");
     return true;
   }
 
   // Stay awake if button was pressed (manual override)
   if (buttonPressed)
   {
-    WEB_LOG("Button pressed - staying awake");
     return true;
   }
 
   // Stay awake if web requests are being made
   if (recentWebActivity())
   {
-    WEB_LOG("Recent web activity - staying awake");
     return true;
   }
 
@@ -265,8 +249,9 @@ bool shouldStayAwake()
 
 bool serialConnected()
 {
+  return false;
   // For Arduino/ESP32: Check if serial is ready
-  return Serial; // Implicitly converts to bool
+  // return Serial; // Implicitly converts to bool
 }
 
 // Shared variable for tracking web activity
@@ -284,42 +269,39 @@ void trackWebActivity()
 
 void loop()
 {
-  static unsigned long lastOTACheck = 0;
-
-  // Handle OTA updates
   ArduinoOTA.handle();
 
   if (!shouldStayAwake())
   {
-
     WEB_LOG("OTA window expired - preparing for sleep");
     calculateNextWakeTime();
     enterDeepSleep();
   }
 
-  // Handle button press for manual operations
   if (buttonPressed)
   {
     handleButtonPress();
   }
-  // Show status LED every x seconds when awake
-  if (millis() - lastOTACheck > 5000)
+
+  static unsigned long lastStatusUpdate = 0;
+  if (millis() - lastStatusUpdate > 5000)
   {
-    lastOTACheck = millis();
-
-    // Brief blue flash to indicate device is awake and ready for OTA
-    initializeLEDs();
-    leds[0] = CRGB::Blue;
-    FastLED.setBrightness(50);
-    FastLED.show();
-    delay(500);
-    FastLED.clear();
-    FastLED.show();
-
-    WEB_LOG("Device awake - Ready for OTA updates");
+    lastStatusUpdate = millis();
+    showStatusIndicator();
   }
 
   delay(100);
+}
+
+void showStatusIndicator()
+{
+  initializeLEDs();
+  leds[0] = CRGB::Blue;
+  FastLED.setBrightness(50);
+  FastLED.show();
+  delay(100);
+  FastLED.clear();
+  FastLED.show();
 }
 
 void setupButton()
@@ -341,7 +323,7 @@ void IRAM_ATTR buttonISR()
 
 void handleButtonPress()
 {
-  DEBUG_PRINTLN("Button pressed - Manual sync triggered");
+  WEB_LOG("Button pressed - Manual sync triggered");
   buttonPressed = false;
 
   // Visual feedback - quick blue flash
@@ -356,7 +338,7 @@ void handleButtonPress()
   // Force fetch alarms
   fetchAlarms();
 
-  DEBUG_PRINTLN("Manual sync completed");
+  WEB_LOG("Manual sync completed");
 }
 
 void connectToWiFi()
@@ -388,21 +370,15 @@ void connectToWiFi()
 
 void setupOTA()
 {
-  WEB_LOG("Setting up ArduinoOTA updates...");
+  WEB_LOG("Setting up OTA updates...");
 
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   ArduinoOTA.setPassword(OTA_PASSWORD);
 
   ArduinoOTA.onStart([]()
                      {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else { // U_SPIFFS
-      type = "filesystem";
-    }
+    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
     WEB_LOG("OTA Start updating " + type);
-    // Turn off LEDs during update
     initializeLEDs();
     FastLED.clear();
     FastLED.show(); });
@@ -412,7 +388,6 @@ void setupOTA()
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
                         {
-    // Show progress with LEDs
     initializeLEDs();
     int ledProgress = (progress * NUM_LEDS) / total;
     FastLED.clear();
@@ -431,7 +406,6 @@ void setupOTA()
     else if (error == OTA_END_ERROR) errorMsg += "End Failed";
     WEB_LOG(errorMsg);
     
-    // Flash red LEDs to indicate error
     initializeLEDs();
     for (int i = 0; i < 3; i++) {
       fill_solid(leds, NUM_LEDS, CRGB::Red);
@@ -443,8 +417,7 @@ void setupOTA()
     } });
 
   ArduinoOTA.begin();
-  WEB_LOG("OTA Ready - Use Arduino IDE or platformio for updates");
-  WEB_LOG("OTA Hostname: " + String(OTA_HOSTNAME) + ", Password: " + String(OTA_PASSWORD));
+  WEB_LOG("OTA Ready - Hostname: " + String(OTA_HOSTNAME));
 }
 
 void setupWebServer()
