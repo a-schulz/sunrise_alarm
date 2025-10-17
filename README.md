@@ -171,51 +171,65 @@ The ESP32's built-in BOOT button (GPIO0) provides manual sync functionality:
 
 | **Scenario** | **OTA Available** | **How to Activate** |
 |--------------|-------------------|---------------------|
-| **Initial Startup** | ✅ Yes | First boot after power on or reset |
-| **Button Wake** | ✅ Yes | Press BOOT button to wake from sleep |
-| **Deep Sleep Wake** | ❌ No | Device goes straight back to sleep |
+| **Initial Power-On** | ✅ Yes (5 minutes) | Power on device or press RST/EN button |
+| **Button Wake** | ✅ Yes (5 minutes) | Press BOOT button to wake from sleep |
+| **Deep Sleep Wake** | ❌ No | Device wakes briefly then returns to sleep |
+| **Web Activity** | ✅ Yes (60 seconds) | Access web interface extends wake time |
 
 **Why this design?**
-- **Battery efficiency**: Deep sleep wakes are frequent (every hour) - enabling OTA would drain battery
-- **Predictable updates**: You know exactly when OTA is available
-- **Development friendly**: Button press gives you OTA access anytime
+- **Battery efficiency**: Deep sleep wakes happen frequently (hourly) for alarm checks - enabling OTA would drain battery
+- **Predictable updates**: You control exactly when OTA is available
+- **Always accessible**: Press BOOT button anytime to enable OTA for updates or debugging
 
 ### How to Perform OTA Updates
 
-#### Method 1: Initial Boot (Easiest)
-1. **Power cycle the device** (unplug and plug back in, or press EN/RST button)
-2. **Wait for WiFi connection** (check blue LED flash every 10 seconds)
-3. **Upload firmware** within the OTA window
-4. Device reboots and applies update
+#### Method 1: Power-On Boot (Simplest)
+1. **Power cycle the device** (unplug and replug, or press RST/EN button)
+2. **60-second OTA window** opens automatically
+3. **Blue LED flashes** every 5 seconds confirm OTA readiness
+4. **Upload firmware** via PlatformIO or Arduino IDE
+5. Device reboots and applies update
 
 #### Method 2: Button Wake (Most Convenient)
-1. **Press BOOT button** to wake device from sleep
-2. **Blue LED flashes** indicate device is awake and OTA-ready
-3. **Upload firmware** via PlatformIO or Arduino IDE
-4. Update completes and device reboots
+1. **Press BOOT button** (GPIO0) to wake device
+2. **Blue LED flash** confirms device is awake
+3. **OTA remains available** for 5 minutes
+4. **Upload firmware** or access web interface
+5. Device stays awake for 60 seconds after last activity
+
+#### Method 3: Web Activity
+1. **Access web interface** at `http://<IP>` or `http://sunrise-alarm.local`
+2. **Device stays awake** for 60 seconds after each page load
+3. **Upload firmware** during this window
+4. Keep refreshing pages to extend wake time if needed
 
 ### Visual Status Indicators
 
-When OTA is available:
-- **Blue LED flash** every 10 seconds on first LED
-- **Web interface accessible** at `http://<IP>`
-- **Serial logs** show "Device awake - Ready for OTA updates"
+When OTA is available, you'll see:
+- **Blue LED flash** every 5 seconds (first LED in strip)
+- **Web logs** show current wake reason:
+  - "Staying awake: OTA window (expires in Xs)"
+  - "Staying awake: Button press"
+  - "Staying awake: Web activity (expires in Xs)"
 
 ### OTA Update Process
 
 **PlatformIO:**
 ```bash
-# After first USB upload, configure platformio.ini:
+# First USB upload to configure OTA
+pio run -t upload
+
+# Configure platformio.ini for wireless uploads:
 # upload_protocol = espota
 # upload_port = <ESP32_IP_ADDRESS>
 
-# Then upload wirelessly:
+# Upload wirelessly (device must be awake!)
 pio run -t upload
 ```
 
 **Arduino IDE:**
 1. Tools → Port → Network Ports → `sunrise-alarm at <IP>`
-2. Upload sketch normally
+2. Upload sketch (device must be awake!)
 
 **During upload:**
 - LEDs show **blue progress bar** across the strip
@@ -230,35 +244,52 @@ pio run -t upload
 | **Hostname** | `sunrise-alarm` | `config.h` → `OTA_HOSTNAME` |
 | **Password** | `sunrise2024` | `config.h` → `OTA_PASSWORD` |
 | **Port** | `3232` | Standard ArduinoOTA port |
+| **Initial Window** | 60 seconds | After power-on only |
+| **Button Wake** | Until idle | Press BOOT to activate |
 
 ### OTA Troubleshooting
 
 **"Device not found" error:**
-- Device is in deep sleep - press BOOT button to wake
+- Device is in deep sleep - **press BOOT button** to wake
 - Check device and computer are on same network
-- Verify IP address hasn't changed (check router)
+- Verify IP address hasn't changed (check router or serial monitor)
+- Try power cycling device for fresh 60-second window
 
 **"Auth Failed" error:**
-- OTA password mismatch
-- Check `config.h` has correct `OTA_PASSWORD`
-- Re-upload via USB once to reset credentials
+- OTA password mismatch in `config.h`
+- Check `OTA_PASSWORD` matches on device and in IDE
+- Re-upload via USB to reset credentials
 
 **Upload timeout:**
-- WiFi connection unstable
-- Device went to sleep during upload (shouldn't happen with button wake)
-- Try power cycling and uploading immediately
+- WiFi connection unstable - move closer to router
+- Device went to sleep (button press should prevent this)
+- Try accessing web interface first to keep device awake
+- Power cycle for guaranteed 60-second window
+
+**Device immediately sleeps:**
+- Normal behavior after deep sleep alarm checks
+- **Solution**: Press BOOT button before attempting OTA
+- **Alternative**: Power cycle for automatic 60-second window
 
 ### Development Workflow
 
 **For active development:**
-1. Keep USB connected - serial monitor prevents sleep
-2. Press BOOT button when needed for wireless updates
-3. Use web interface for remote debugging
+1. **Keep device awake**: Press BOOT button or keep web interface open
+2. **Web activity extends wake time**: Each page refresh adds 60 seconds
+3. **Serial monitor**: Connect via USB for debugging (doesn't prevent sleep)
+4. **Quick updates**: Power cycle for fast 60-second upload window
 
 **For production use:**
-1. Power cycle or button press for updates
-2. Device sleeps between alarms for battery efficiency
-3. Web logs available during OTA window
+1. **Device sleeps** between alarms for battery efficiency
+2. **Update on demand**: Press BOOT button when update needed
+3. **Web interface**: Access during OTA window for remote monitoring
+4. **No interruption**: Updates only happen when you initiate them
+
+**Best practices:**
+- Always power cycle or press BOOT button before attempting OTA
+- Monitor serial output or web logs to confirm OTA availability
+- Keep web interface open during long operations to prevent sleep
+- Test updates on initial boot window for maximum stability
 
 ## 📱 Web Interface & Remote Access
 

@@ -50,14 +50,14 @@ void webLog(String message)
 // RTC memory to persist data across deep sleep
 RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR uint64_t nextAlarmTime = 0;
-RTC_DATA_ATTR bool wasButtonWake = false; // Track if woken by button
 
 // Timing constants for OTA accessibility
-#define OTA_WINDOW_DURATION 300000 // 5 minutes in milliseconds
+#define OTA_WINDOW_DURATION 60000 // 1 minute in milliseconds
 
 // Button variables
 volatile bool buttonPressed = false;
 unsigned long lastButtonPress = 0;
+unsigned long lastWebRequest = 0;
 unsigned long bootTime = 0;
 bool otaEnabled = false; // Track if OTA is active this boot
 uint32_t lastOtaProgress = 0;
@@ -225,21 +225,17 @@ void setup()
 
 bool shouldStayAwake()
 {
-  // Stay awake if OTA is enabled
-  if (millis() - bootTime < OTA_WINDOW_DURATION)
-  {
-    WEB_LOG("Staying awake for OTA window for next " + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + " seconds");
-    return true;
-  }
-
-  // Stay awake if button was pressed (manual override)
   if (buttonPressed)
   {
     return true;
   }
 
-  // Stay awake if web requests are being made
   if (recentWebActivity())
+  {
+    return true;
+  }
+
+  if (bootCount == 1 && millis() - bootTime < OTA_WINDOW_DURATION)
   {
     return true;
   }
@@ -254,12 +250,9 @@ bool serialConnected()
   // return Serial; // Implicitly converts to bool
 }
 
-// Shared variable for tracking web activity
-static unsigned long lastWebRequest = 0;
-
 bool recentWebActivity()
 {
-  return (millis() - lastWebRequest < 60000); // Active if web request in last minute
+  return (millis() - lastWebRequest < 60000);
 }
 
 void trackWebActivity()
@@ -288,6 +281,22 @@ void loop()
   {
     lastStatusUpdate = millis();
     showStatusIndicator();
+    
+    String reason = "Unknown";
+    if (buttonPressed)
+    {
+      reason = "Button press";
+    }
+    else if (recentWebActivity())
+    {
+      reason = "Web activity (expires in " + String((60000 - (millis() - lastWebRequest)) / 1000) + "s)";
+    }
+    else if (millis() - bootTime < OTA_WINDOW_DURATION)
+    {
+      reason = "OTA window (expires in " + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + "s)";
+    }
+    
+    WEB_LOG("Staying awake: " + reason);
   }
 
   delay(100);
@@ -317,7 +326,6 @@ void IRAM_ATTR buttonISR()
   {
     buttonPressed = true;
     lastButtonPress = now;
-    wasButtonWake = true;
   }
 }
 
