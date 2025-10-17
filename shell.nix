@@ -33,6 +33,10 @@ pkgs.mkShell {
     echo "  pio run -t upload - Upload to ESP32"
     echo "  pio device monitor - Monitor serial output"
     echo ""
+    echo "If you want to use OTA Updates make sure to disable system firewall for this e.g. using"
+    echo "  sudo nixos-firewall-tool open tcp 13351"
     echo "Make sure to configure your settings in include/config.h"
+    echo "==============================="
+    echo "==============================="
   '';
 }

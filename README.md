@@ -239,6 +239,12 @@ pio run -t upload
 - Device may have entered deep sleep - **power cycle to restart 5-minute window**
 - Check device and computer are on same network
 - Verify IP address hasn't changed (check router or serial monitor)
+- **Firewall blocking**: Ensure port 13351 is open on your system firewall (you can specify this in the platformio.ini with `--host_port=13351`)
+  - **NixOS users**: `sudo nixos-firewall-tool open tcp 13351`
+  - **Linux (ufw)**: `sudo ufw allow 13351/tcp`
+  - **Linux (firewalld)**: `sudo firewall-cmd --add-port=13351/tcp --permanent && sudo firewall-cmsd --reload`
+  - **macOS**: System Preferences → Security & Privacy → Firewall → Firewall Options
+  - **Windows**: Windows Defender Firewall → Advanced Settings → Inbound Rules → New Rule
 
 **"Auth Failed" error:**
 
