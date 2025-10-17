@@ -52,15 +52,14 @@ RTC_DATA_ATTR int bootCount = 0;
 RTC_DATA_ATTR uint64_t nextAlarmTime = 0;
 
 // Timing constants for OTA accessibility
-#define OTA_WINDOW_DURATION 60000 // 1 minute in milliseconds
+#define OTA_WINDOW_DURATION 300000 // 5 minutes in milliseconds
 
 // Button variables
 volatile bool buttonPressed = false;
 unsigned long lastButtonPress = 0;
 unsigned long lastWebRequest = 0;
 unsigned long bootTime = 0;
-bool otaEnabled = false; // Track if OTA is active this boot
-uint32_t lastOtaProgress = 0;
+bool alarmRunning = false;
 bool ledsInitialized = false; // Track if LEDs have been initialized
 
 // Alarm structure
@@ -174,48 +173,38 @@ void showStatusIndicator();
 void setup()
 {
   Serial.begin(115200);
-  delay(1000);
+  delay(100);
 
   bootTime = millis();
 
   WEB_LOG("=== Sunrise Alarm Clock Starting ===");
   WEB_LOG("Boot count: " + String(++bootCount));
 
-  // Setup button only on initial boot
   if (bootCount == 1)
   {
     setupButton();
   }
 
-  // Connect to WiFi
   connectToWiFi();
 
-  // Setup OTA updates
-  setupOTA();
-  setupWebServer();
+  if (bootCount == 1 || buttonPressed)
+  {
+    setupOTA();
+    setupWebServer();
+  }
 
-  // Initialize Supabase
-  db.begin(SUPABASE_URL, SUPABASE_KEY);
-
-  // Sync time with NTP
   syncTime();
-
-  // Fetch alarms from Supabase
   fetchAlarms();
 
-  // Check if any alarm should trigger now
-  checkAlarms();
-
-  // Handle any button press for manual sync
   if (buttonPressed)
   {
     handleButtonPress();
   }
 
-  // Determine if we should stay awake or sleep
+  checkAlarms();
+
   if (!shouldStayAwake())
   {
-    // Calculate next wake time and go to deep sleep
     calculateNextWakeTime();
     enterDeepSleep();
   }
@@ -281,7 +270,7 @@ void loop()
   {
     lastStatusUpdate = millis();
     showStatusIndicator();
-    
+
     String reason = "Unknown";
     if (buttonPressed)
     {
@@ -295,7 +284,7 @@ void loop()
     {
       reason = "OTA window (expires in " + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + "s)";
     }
-    
+
     WEB_LOG("Staying awake: " + reason);
   }
 
@@ -332,9 +321,7 @@ void IRAM_ATTR buttonISR()
 void handleButtonPress()
 {
   WEB_LOG("Button pressed - Manual sync triggered");
-  buttonPressed = false;
 
-  // Visual feedback - quick blue flash
   initializeLEDs();
   fill_solid(leds, NUM_LEDS, CRGB::Blue);
   FastLED.setBrightness(100);
@@ -343,7 +330,6 @@ void handleButtonPress()
   FastLED.clear();
   FastLED.show();
 
-  // Force fetch alarms
   fetchAlarms();
 
   WEB_LOG("Manual sync completed");
@@ -563,6 +549,8 @@ void fetchAlarms()
   }
 
   DEBUG_PRINTLN("Fetching alarms from Supabase...");
+  // Initialize Supabase
+  db.begin(SUPABASE_URL, SUPABASE_KEY);
 
   // Use ESPSupabase API to fetch alarms for this device
   String result = db.from("alarms").select("*").eq("device_id", WiFi.macAddress()).eq("is_enabled", "true").doSelect();
@@ -941,22 +929,20 @@ void enterDeepSleep()
 {
   DEBUG_PRINTLN("Entering deep sleep...");
 
-  // Turn off WiFi
+  buttonPressed = false;
+
   WiFi.disconnect();
   WiFi.mode(WIFI_OFF);
 
-  // Clear LEDs only if they were actually initialized
   if (ledsInitialized)
   {
     FastLED.clear();
     FastLED.show();
   }
 
-  // Configure wake up sources
   esp_sleep_enable_timer_wakeup(min(nextAlarmTime, DEEP_SLEEP_DURATION));
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0); // Wake on button press (low level)
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
 
-  // Enter deep sleep
   esp_deep_sleep_start();
 }
 
