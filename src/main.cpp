@@ -104,8 +104,8 @@ void loop()
     last_status_update = millis();
     LEDController::show_status_indicator();
 
-    String reason = "Unknown";
-    if (boot_count == 1 && WebServerManager::has_recent_activity())
+    String reason = "Unknown reason";
+    if (WebServerManager::has_recent_activity())
     {
       unsigned long time_left = 60000 - (millis() - WebServerManager::get_last_activity_time());
       reason = "Recent web activity (expires in " + String(time_left / 1000) + "s)";
@@ -114,10 +114,6 @@ void loop()
     {
       unsigned long time_left = OTA_WINDOW_DURATION - (millis() - boot_time);
       reason = "OTA window (expires in " + String(time_left / 1000) + "s)";
-    }
-    else
-    {
-      reason = "Unknown reason";
     }
 
     WEB_LOG("Staying awake: " + reason);

@@ -5,6 +5,8 @@
 CRGB *LEDController::leds = nullptr;
 int LEDController::num_leds = NUM_LEDS;
 bool LEDController::initialized = false;
+bool LEDController::alarm_running = false;
+bool LEDController::dismiss_requested = false;
 
 void LEDController::init()
 {
@@ -95,8 +97,10 @@ void LEDController::run_sunrise_animation(ColorPreset &preset, int duration_ms, 
 
     DEBUG_PRINTLN("Starting advanced sunrise animation...");
     init();
+    alarm_running = true;
+    dismiss_requested = false;
 
-    while (millis() - start_time < duration_ms)
+    while (millis() - start_time < duration_ms && !dismiss_requested)
     {
         float progress = (float)(millis() - start_time) / (float)duration_ms;
         if (progress > 1.0)
@@ -142,14 +146,23 @@ void LEDController::run_sunrise_animation(ColorPreset &preset, int duration_ms, 
         }
     }
 
+    if (dismiss_requested)
+    {
+        DEBUG_PRINTLN("Alarm dismissed by user");
+        clear();
+        alarm_running = false;
+        dismiss_requested = false;
+        return;
+    }
+
     DEBUG_PRINTLN("Main animation complete - entering daylight phase");
 
     CRGB final_color = preset.stages[preset.stage_count - 1].color;
     FastLED.setBrightness(max_brightness);
 
-    for (int minute = 0; minute < 5; minute++)
+    for (int minute = 0; minute < 5 && !dismiss_requested; minute++)
     {
-        for (int second = 0; second < 60; second++)
+        for (int second = 0; second < 60 && !dismiss_requested; second++)
         {
             float variation = 0.95f + 0.1f * sin(millis() * 0.001f);
             FastLED.setBrightness((int)(max_brightness * variation));
@@ -167,6 +180,15 @@ void LEDController::run_sunrise_animation(ColorPreset &preset, int duration_ms, 
         DEBUG_PRINTLN("/5 minutes");
     }
 
+    if (dismiss_requested)
+    {
+        DEBUG_PRINTLN("Alarm dismissed during daylight phase");
+        clear();
+        alarm_running = false;
+        dismiss_requested = false;
+        return;
+    }
+
     DEBUG_PRINTLN("Starting fade out...");
     for (int brightness = max_brightness; brightness >= 0; brightness -= 2)
     {
@@ -176,7 +198,14 @@ void LEDController::run_sunrise_animation(ColorPreset &preset, int duration_ms, 
     }
 
     clear();
+    alarm_running = false;
     DEBUG_PRINTLN("Sunrise alarm completed");
+}
+
+void LEDController::dismiss_alarm()
+{
+    dismiss_requested = true;
+    WEB_LOG("Alarm dismiss requested");
 }
 
 CRGB LEDController::blend_multiple_colors(SunriseStage stages[], int stage_count, float progress)

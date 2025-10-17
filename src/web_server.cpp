@@ -62,19 +62,36 @@ void WebServerManager::setup_routes()
         WEB_LOG("Manual sync triggered via web");
         AlarmManager::fetch_alarms_from_db();
             request->send(200, "text/plain", "Alarm sync started. Check logs for details!"); });
+
+    server->on("/alarm/dismiss", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+        track_activity();
+        if (LEDController::is_alarm_running()) {
+            WEB_LOG("Alarm dismissed via web interface");
+            LEDController::dismiss_alarm();
+            request->send(200, "text/plain", "Alarm dismissed!");
+        } else {
+            WEB_LOG("Dismiss requested but no alarm is running");
+            request->send(200, "text/plain", "No alarm is currently running.");
+        } });
 }
 
 String WebServerManager::build_dashboard_html()
 {
-    String html = "<!DOCTYPE html><html><head><title>Sunrise Alarm</title>";
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<title>Sunrise Alarm</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<style>body{font-family:Arial;margin:20px;background:#f0f0f0}";
     html += ".card{background:white;padding:20px;margin:10px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}";
     html += ".btn{background:#007bff;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;margin:5px}";
     html += ".btn:hover{background:#0056b3}";
+    html += ".btn-danger{background:#dc3545}";
+    html += ".btn-danger:hover{background:#c82333}";
     html += ".status{padding:10px;border-radius:4px;margin:10px 0}";
     html += ".success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}";
-    html += ".info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}</style></head><body>";
+    html += ".info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}";
+    html += ".warning{background:#fff3cd;color:#856404;border:1px solid #ffeaa7}</style></head><body>";
 
     html += "<h1>🌅 Sunrise Alarm Control</h1>";
 
@@ -96,10 +113,15 @@ String WebServerManager::build_dashboard_html()
     html += "</div>";
 
     html += "<div class='card'><h2>Controls</h2>";
+    
+    if (LEDController::is_alarm_running()) {
+        html += "<div class='status warning'>⚠️ Alarm is currently running!</div>";
+        html += "<button class='btn btn-danger' onclick=\"if(confirm('Dismiss the current alarm?')) location.href='/alarm/dismiss'\">❌ Dismiss Alarm</button><br>";
+    }
+    
     html += "<button class='btn' onclick=\"location.href='/logs'\">📋 View Logs</button>";
     html += "<button class='btn' onclick=\"location.href='/test'\">🌈 Test LEDs</button>";
     html += "<button class='btn' onclick=\"location.href='/sync'\">🔄 Sync Alarms</button>";
-    html += "<button class='btn' onclick=\"location.href='/update'\">⬆️ OTA Update</button>";
     html += "</div>";
 
     html += "</body></html>";
@@ -108,7 +130,9 @@ String WebServerManager::build_dashboard_html()
 
 String WebServerManager::build_logs_html()
 {
-    String html = "<!DOCTYPE html><html><head><title>System Logs</title>";
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta charset='UTF-8'>";
+    html += "<title>System Logs</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<meta http-equiv='refresh' content='5'>";
     html += "<style>body{font-family:monospace;margin:20px;background:#000;color:#0f0}";

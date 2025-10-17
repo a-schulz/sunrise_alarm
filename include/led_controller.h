@@ -17,11 +17,15 @@ public:
     static void run_test_animation();
     static void run_sunrise_animation(ColorPreset &preset, int duration_ms, int max_brightness);
     static bool is_initialized() { return initialized; }
+    static bool is_alarm_running() { return alarm_running; }
+    static void dismiss_alarm();
 
 private:
     static CRGB *leds;
     static int num_leds;
     static bool initialized;
+    static bool alarm_running;
+    static bool dismiss_requested;
 
     static CRGB blend_multiple_colors(SunriseStage stages[], int stage_count, float progress);
     static void add_sparkle_effect(CRGB base_color, float intensity);
