@@ -6,6 +6,7 @@
 #include <logger.h>
 #include <network_manager.h>
 #include <database.h>
+#include <web_server.h>
 
 Alarm AlarmManager::alarms[10];
 int AlarmManager::alarm_count = 0;
@@ -153,6 +154,7 @@ void AlarmManager::check_alarms()
         {
 
             DEBUG_PRINTLN("Alarm triggered! Starting sunrise simulation...");
+            WebServerManager::init();
             trigger_sunrise_alarm(alarms[i]);
             return;
         }
