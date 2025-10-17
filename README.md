@@ -10,7 +10,7 @@
 ## ✨ Features
 
 - 🌄 **Gradual sunrise simulation** - Smooth LED brightness transition mimicking natural sunrise
-- 🔌 **Low power consumption** - Utilizes ESP32 deep sleep mode for energy efficiency  
+- 🔌 **Low power consumption** - Utilizes ESP32 deep sleep mode for energy efficiency
 - 📡 **WiFi connectivity** - Automatic time synchronization with NTP servers
 - 🗄️ **Cloud-based alarms** - Alarm configurations stored and retrieved from Supabase database
 - 🔘 **Manual sync button** - Press ESP32 boot button to force sync with database
@@ -25,7 +25,7 @@
 │     ESP32       │◄──────────►│   NTP Server    │
 │   (Button GPIO0)│             │  (Time Sync)    │
 └─────┬───────────┘             └─────────────────┘
-      │                                    
+      │
       │ Data Pin                          ┌─────────────────┐
       ▼                    ESPSupabase    │   Supabase DB   │
 ┌─────────────────┐          ◄──────────►│ (Alarm Config)  │
@@ -36,19 +36,19 @@
 
 ## 🛠️ Hardware Requirements
 
-| Component | Description | Quantity |
-|-----------|-------------|----------|
-| **ESP32** | Main microcontroller with WiFi capability | 1 |
-| **WS2812B LED Strip** | Addressable RGB LED strip | 1 |
-| **5V Power Supply** | For ESP32 and LED strip | 1 |
-| **Jumper Cables** | For connections | Several |
-| **Breadboard** *(optional)* | For prototyping | 1 |
+| Component                   | Description                               | Quantity |
+| --------------------------- | ----------------------------------------- | -------- |
+| **ESP32**                   | Main microcontroller with WiFi capability | 1        |
+| **WS2812B LED Strip**       | Addressable RGB LED strip                 | 1        |
+| **5V Power Supply**         | For ESP32 and LED strip                   | 1        |
+| **Jumper Cables**           | For connections                           | Several  |
+| **Breadboard** _(optional)_ | For prototyping                           | 1        |
 
 ### Wiring Diagram
 
 ```
 ESP32 Pin 4  ──► LED Strip Data Pin
-ESP32 GND    ──► LED Strip GND  
+ESP32 GND    ──► LED Strip GND
 5V Supply    ──► LED Strip VCC
 5V Supply    ──► ESP32 VIN (or use USB power)
 GPIO0        ──► Built-in BOOT button (manual sync)
@@ -108,23 +108,28 @@ The database uses the following RLS policies for secure device access:
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/yourusername/sunrise-alarm.git
    cd sunrise-alarm
    ```
 
 2. **Install dependencies**
+
    ```bash
    pio lib install  # PlatformIO will install all dependencies automatically
    ```
 
 3. **Configure settings**
+
    ```bash
    cp include/config.example.h include/config.h
    ```
+
    Edit `include/config.h` with your WiFi and Supabase credentials
 
 4. **Set up Supabase database**
+
    - Create a new Supabase project
    - Run the SQL script from `database_setup.sql` in your Supabase SQL editor
    - Get your project URL and anon key from Settings > API
@@ -144,7 +149,7 @@ Create/edit `include/config.h` with your settings:
 #define WIFI_SSID "YourWiFiName"
 #define WIFI_PASSWORD "YourWiFiPassword"
 
-// Supabase Configuration  
+// Supabase Configuration
 #define SUPABASE_URL "https://your-project.supabase.co"
 #define SUPABASE_KEY "your_supabase_anon_key"
 
@@ -158,47 +163,42 @@ Create/edit `include/config.h` with your settings:
 
 ### ⚠️ Important: OTA Availability
 
-**OTA updates are ONLY available in these scenarios:**
+**OTA updates are ONLY available during:**
 
-| **Scenario** | **OTA Available** | **Duration** |
-|--------------|-------------------|--------------|
-| **Initial Power-On** | ✅ Yes | 5 minutes |
-| **Button Press** | ✅ Yes | Until idle (60s after last activity) |
-| **Deep Sleep Wake** | ❌ No | Device immediately returns to sleep |
+| **Scenario**         | **OTA Available** | **Duration** |
+| -------------------- | ----------------- | ------------ |
+| **Initial Power-On** | ✅ Yes            | 5 minutes    |
+| **During Alarm**     | ❌ No             | N/A          |
+| **Deep Sleep Wake**  | ❌ No             | N/A          |
+| **Button Press**     | ❌ No             | N/A          |
 
 **Why this design?**
-- **Battery efficiency**: Deep sleep wakes happen frequently (hourly) for alarm checks - enabling OTA would drain battery
-- **Predictable updates**: You control exactly when OTA is available
-- **Always accessible**: Press BOOT button anytime to enable OTA for updates or debugging
+
+- **Battery efficiency**: OTA is only available during the initial boot window
+- **Predictable updates**: You control exactly when OTA is available by power cycling
+- **No interruptions**: Alarms run without OTA overhead
 
 ### How to Perform OTA Updates
 
-#### Method 1: Power-On Boot (Simplest)
+#### Power-On Boot Method
+
 1. **Power cycle the device** (unplug and replug, or press RST/EN button)
 2. **5-minute OTA window** opens automatically
-3. **Blue LED flashes** every 5 seconds confirm OTA readiness
+3. **Blue LED flashes** every 5 seconds to confirm OTA readiness
 4. **Upload firmware** via PlatformIO or Arduino IDE
 5. Device reboots and applies update
-
-#### Method 2: Button Press (Most Convenient)
-1. **Press BOOT button** (GPIO0) to wake device
-2. **Blue LED flash** confirms device is awake and OTA enabled
-3. **Device stays awake** for 60 seconds after last activity
-4. **Upload firmware** or access web interface
-5. Web activity extends wake time by 60 seconds
 
 ### Visual Status Indicators
 
 When OTA is available, you'll see:
+
 - **Blue LED flash** every 5 seconds (first LED in strip)
-- **Web logs** show current wake reason:
-  - "Staying awake: OTA window (expires in Xs)"
-  - "Staying awake: Button press"
-  - "Staying awake: Web activity (expires in Xs)"
+- **Web logs** show: "OTA Ready - Use Arduino IDE or platformio for updates"
 
 ### OTA Update Process
 
 **PlatformIO:**
+
 ```bash
 # First USB upload to configure OTA
 pio run -t upload
@@ -207,15 +207,17 @@ pio run -t upload
 # upload_protocol = espota
 # upload_port = <ESP32_IP_ADDRESS>
 
-# Upload wirelessly (device must be awake!)
+# Upload wirelessly (within 5 minutes of power-on!)
 pio run -t upload
 ```
 
 **Arduino IDE:**
+
 1. Tools → Port → Network Ports → `sunrise-alarm at <IP>`
-2. Upload sketch (device must be awake!)
+2. Upload sketch (within 5 minutes of power-on!)
 
 **During upload:**
+
 - LEDs show **blue progress bar** across the strip
 - Upload takes 20-30 seconds typically
 - Device automatically reboots on success
@@ -223,57 +225,52 @@ pio run -t upload
 
 ### OTA Configuration
 
-| Setting | Value | Location |
-|---------|-------|----------|
-| **Hostname** | `sunrise-alarm` | `config.h` → `OTA_HOSTNAME` |
-| **Password** | `sunrise2024` | `config.h` → `OTA_PASSWORD` |
-| **Port** | `3232` | Standard ArduinoOTA port |
-| **Initial Window** | 5 minutes | After power-on only |
-| **Button Wake** | Until idle | Press BOOT to activate |
+| Setting            | Value           | Location                    |
+| ------------------ | --------------- | --------------------------- |
+| **Hostname**       | `sunrise-alarm` | `config.h` → `OTA_HOSTNAME` |
+| **Password**       | `sunrise2024`   | `config.h` → `OTA_PASSWORD` |
+| **Port**           | `3232`          | Standard ArduinoOTA port    |
+| **Initial Window** | 5 minutes       | After power-on only         |
 
 ### OTA Troubleshooting
 
 **"Device not found" error:**
-- Device is in deep sleep - **press BOOT button** to wake
+
+- Device may have entered deep sleep - **power cycle to restart 5-minute window**
 - Check device and computer are on same network
 - Verify IP address hasn't changed (check router or serial monitor)
-- Try power cycling device for fresh 5-minute window
 
 **"Auth Failed" error:**
+
 - OTA password mismatch in `config.h`
 - Check `OTA_PASSWORD` matches on device and in IDE
 - Re-upload via USB to reset credentials
 
 **Upload timeout:**
+
 - WiFi connection unstable - move closer to router
-- Device went to sleep (button press should prevent this)
-- Try accessing web interface first to keep device awake
-- Power cycle for guaranteed 5-minute window
+- 5-minute window expired - power cycle device
+- Try accessing web interface first to confirm device is online
 
 **Device immediately sleeps:**
-- Normal behavior after deep sleep alarm checks
-- **Solution**: Press BOOT button before attempting OTA
-- **Alternative**: Power cycle for automatic 5-minute window
+
+- Normal behavior after 5-minute window expires
+- **Solution**: Power cycle for new 5-minute window
 
 ### Development Workflow
 
 **For active development:**
-1. **Keep device awake**: Press BOOT button or keep web interface open
-2. **Web activity extends wake time**: Each page refresh adds 60 seconds
-3. **Serial monitor**: Connect via USB for debugging
-4. **Quick updates**: Power cycle for fast 5-minute upload window
+
+1. **Keep device powered on**: Device stays available for 5 minutes after boot
+2. **Serial monitor**: Connect via USB for debugging
+3. **Quick updates**: Power cycle between uploads for fresh OTA window
 
 **For production use:**
-1. **Device sleeps** between alarms for battery efficiency
-2. **Update on demand**: Press BOOT button when update needed
-3. **Web interface**: Only available when OTA is active
-4. **No interruption**: Updates only happen when you initiate them
 
-**Best practices:**
-- Always power cycle or press BOOT button before attempting OTA
-- Monitor serial output or web logs to confirm OTA availability
-- Keep web interface open during long operations to prevent sleep
-- Test updates on initial boot window for maximum stability
+1. **Device sleeps** between alarms for battery efficiency
+2. **Update on demand**: Power cycle when update needed
+3. **Web interface**: Available during initial boot window and alarms
+4. **No interruption**: Updates only happen during scheduled windows
 
 ## 📱 Web Interface & Remote Access
 
@@ -281,93 +278,85 @@ pio run -t upload
 
 **The web interface is ONLY available when:**
 
-| **Scenario** | **Web Server Active** |
-|--------------|----------------------|
-| **Initial Power-On** | ✅ Yes (5 minutes) |
-| **Button Press** | ✅ Yes (until idle) |
-| **During Alarm** | ✅ Yes (during sunrise animation) |
-| **Deep Sleep Wake** | ❌ No |
+| **Scenario**         | **Web Server Active** | **Duration**             |
+| -------------------- | --------------------- | ------------------------ |
+| **Initial Power-On** | ✅ Yes                | 5 minutes                |
+| **During Alarm**     | ✅ Yes                | Duration of alarm        |
+| **Deep Sleep Wake**  | ❌ No                 | N/A                      |
+| **Button Press**     | ❌ No                 | Device enters deep sleep |
 
 This design saves power by only running the web server when needed.
 
-### Accessing the Web Dashboard
+## 🔘 Button Functions
 
-Once your ESP32 is awake and the web server is running:
+### BOOT Button (GPIO0)
 
-1. **Find the IP address**: Check your router's admin panel or serial monitor
-2. **Open browser**: Navigate to `http://<ESP32_IP_ADDRESS>` 
-3. **Alternative**: Use the hostname `http://sunrise-alarm.local` (if mDNS is supported)
+The built-in BOOT button provides manual control:
 
-### Web Interface Features
+**Press BOOT button:**
 
-| Page | URL | Description |
-|------|-----|-------------|
-| **Dashboard** | `/` | System status, controls, device info |
-| **Live Logs** | `/logs` | Real-time system logs with auto-refresh |
-| **LED Test** | `/test` | Rainbow LED test animation |
-| **Manual Sync** | `/sync` | Force alarm synchronization |
+- **Triggers immediate alarm sync** with Supabase database
+- **Device enters deep sleep** immediately after sync
+- **Use case**: Force update of alarm schedule or manually put device to sleep
 
-### Real-Time Logging
+**Behavior:**
 
-The device provides comprehensive web-based logging when server is active:
+1. Press BOOT button (GPIO0)
+2. Device syncs alarms from Supabase
+3. LEDs briefly show sync feedback
+4. Device immediately enters deep sleep
+5. Wakes at next scheduled alarm time
 
-- **Auto-refresh**: Logs page refreshes every 5 seconds
-- **Persistent storage**: Last 100 log entries retained in memory
-- **Timestamps**: All logs include precise timestamps
-- **Multiple sources**: Boot events, WiFi status, alarm triggers, errors
-- **Activity tracking**: Each page access extends wake time by 60 seconds
-
-**Access logs via**: `http://<ESP32_IP>/logs`
-
-Example log output:
-```
-07:30:15 === Sunrise Alarm Clock Starting ===
-07:30:16 Boot count: 1
-07:30:17 WiFi connected! IP: 192.168.1.100
-07:30:18 OTA Ready - Use Arduino IDE or platformio for updates
-07:30:19 Web server started on http://192.168.1.100
-07:30:20 Alarms fetched successfully
-07:30:21 Total alarms loaded: 3
-```
+**Note**: Button press does NOT enable OTA or web server - only syncs and sleeps.
 
 ## 🔄 Power Management
 
 The ESP32 uses intelligent power management:
 
-- **Active time**: ~10 seconds every hour (or before next alarm)
+- **Active states**:
+  - Initial boot: 5 minutes (OTA + Web Server)
+  - During alarm: Sunrise animation duration
+  - Manual sync: Brief sync then immediate sleep
 - **Sleep current**: ~10µA in deep sleep mode
-- **Wake sources**: 
+- **Wake sources**:
   - Timer interrupt for next alarm check
   - BOOT button press for manual sync
-  - **OTA mode**: Prevents sleep when updates are available
-- **Battery life**: Weeks to months depending on LED usage
+- **Battery life**: Weeks to months depending on LED usage and alarm frequency
 
-### Development Mode
+### Device States
 
-For development and debugging, you can prevent deep sleep:
-
-1. **Serial monitor active**: Device stays awake when connected to USB
-2. **Web interface open**: Periodic requests keep device active
-3. **OTA mode**: Device remains awake for 5 minutes after boot for updates
+```
+Power On → [5 min Active: OTA + Web] → Deep Sleep
+                                            ↓
+                                      Timer Wake ──→ Check Alarm
+                                            ↓              ↓
+                                      Deep Sleep    [Alarm Active: Web + Animation]
+                                            ↑              ↓
+                                            └──────────────┘
+                                            
+Button Press → [Brief: Sync] → Deep Sleep
+```
 
 ## 🎨 Color Presets
 
-| Preset | Description | Color Transition |
-|--------|-------------|------------------|
-| `sunrise` | Natural sunrise simulation | Deep red → Orange → Yellow → White |
-| `ocean` | Ocean-inspired colors | Deep blue → Cyan → Light blue |
-| `forest` | Forest-themed colors | Dark green → Light green → Yellow-green |
-| `lavender` | Gentle morning colors | Purple → Pink → Light pink |
+| Preset     | Description                | Color Transition                        |
+| ---------- | -------------------------- | --------------------------------------- |
+| `sunrise`  | Natural sunrise simulation | Deep red → Orange → Yellow → White      |
+| `ocean`    | Ocean-inspired colors      | Deep blue → Cyan → Light blue           |
+| `forest`   | Forest-themed colors       | Dark green → Light green → Yellow-green |
+| `lavender` | Gentle morning colors      | Purple → Pink → Light pink              |
 
 ## 🔒 Security Features
 
 ### Row Level Security (RLS)
+
 - **Device isolation**: Each ESP32 can only access its own alarms
 - **MAC address filtering**: Uses device MAC as unique identifier
 - **API key protection**: Secure access using Supabase anon key
 - **Automated filtering**: ESPSupabase library handles secure queries
 
-### Data Protection  
+### Data Protection
+
 - Configuration files excluded from git (`.gitignore`)
 - No sensitive data stored on device
 - Encrypted HTTPS communication with Supabase
@@ -384,10 +373,12 @@ VALUES ('YOUR_ESP32_MAC', '07:00:00', ARRAY[1,2,3,4,5], 255, 30, 'sunrise');
 ```
 
 ### Day Codes
+
 - `0` = Sunday, `1` = Monday, `2` = Tuesday, `3` = Wednesday
 - `4` = Thursday, `5` = Friday, `6` = Saturday
 
 ### Remote Management
+
 1. **Supabase Dashboard**: Edit alarms through web interface
 2. **API Integration**: Build custom apps using Supabase REST API
 3. **Manual Sync**: Press BOOT button to force update from database
@@ -397,36 +388,51 @@ VALUES ('YOUR_ESP32_MAC', '07:00:00', ARRAY[1,2,3,4,5], 255, 30, 'sunrise');
 ### Common Issues
 
 **WiFi Connection Failed:**
+
 - Check SSID and password in `config.h`
 - Ensure 2.4GHz WiFi (ESP32 doesn't support 5GHz)
 - Verify signal strength near device
 
 **Database Connection Issues:**
+
 - Verify Supabase URL and API key
 - Check RLS policies are properly configured
 - Ensure device MAC address matches database entries
 
 **LEDs Not Working:**
+
 - Check wiring: Data pin to GPIO4, proper power supply
 - Verify `LED_PIN` and `NUM_LEDS` in configuration
 - Test with smaller LED count first
 
 **Button Not Responding:**
+
 - BOOT button is GPIO0 on most ESP32 boards
-- Check `BUTTON_PIN` configuration
-- Verify debounce timing
+- Button press triggers sync and enters deep sleep (expected behavior)
+- Check serial logs to confirm button detection
 
 **OTA Updates Failing:**
-- Device must be awake (press BOOT button or access web interface)
+
+- Device must be within 5-minute boot window after power-on
 - Check network connectivity and firewall settings
 - Verify OTA password matches configuration
 - Try USB upload first to reset OTA credentials
+- Power cycle device to restart OTA window
 
 **Web Interface Not Accessible:**
+
+- Only available during initial 5 minutes or during alarms
 - Check device IP address in router admin panel
 - Ensure device and computer on same network
 - Try `http://sunrise-alarm.local` if mDNS is available
-- Access logs via serial monitor if web fails
+- Power cycle to restart web server window
+
+**Device Immediately Sleeps:**
+
+- Normal behavior after 5-minute boot window
+- Press BOOT button to sync and sleep manually
+- Wait for scheduled alarm to wake device
+- Power cycle for new 5-minute active window
 
 ### Debug Mode
 
@@ -440,13 +446,13 @@ Monitor serial output at 115200 baud for troubleshooting information.
 
 ### Remote Debugging
 
-When away from the device, use the web interface:
+During the 5-minute boot window or alarms:
 
 1. **Check status**: Access dashboard for system health
 2. **Monitor logs**: Use auto-refreshing logs page
-3. **Force sync**: Trigger manual alarm sync
+3. **Force sync**: Press BOOT button to trigger manual sync
 4. **Test hardware**: Run LED test animation
-5. **Update firmware**: Upload fixes via OTA
+5. **Update firmware**: Upload fixes via OTA (boot window only)
 
 ## 🔄 Development Workflow
 
@@ -454,7 +460,7 @@ When away from the device, use the web interface:
 # Build and upload
 pio run -t upload
 
-# Monitor serial output  
+# Monitor serial output
 pio device monitor
 
 # Clean build
@@ -487,7 +493,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📸 Gallery
 
-> *Add photos of your completed project here*
+> _Add photos of your completed project here_
 
 ---
 
