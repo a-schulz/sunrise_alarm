@@ -154,27 +154,17 @@ Create/edit `include/config.h` with your settings:
 #define BUTTON_PIN 0  // GPIO0 (BOOT button)
 ```
 
-## 🔘 Button Functionality
-
-The ESP32's built-in BOOT button (GPIO0) provides manual sync functionality:
-
-- **Press and release** the BOOT button to force sync with Supabase
-- **Visual feedback**: Blue LED flash confirms sync operation
-- **Wake from sleep**: Button press will wake the device from deep sleep
-- **Debouncing**: Built-in 50ms debounce prevents false triggers
-
 ## 🔄 Over-The-Air (OTA) Updates
 
 ### ⚠️ Important: OTA Availability
 
 **OTA updates are ONLY available in these scenarios:**
 
-| **Scenario** | **OTA Available** | **How to Activate** |
-|--------------|-------------------|---------------------|
-| **Initial Power-On** | ✅ Yes (5 minutes) | Power on device or press RST/EN button |
-| **Button Wake** | ✅ Yes (5 minutes) | Press BOOT button to wake from sleep |
-| **Deep Sleep Wake** | ❌ No | Device wakes briefly then returns to sleep |
-| **Web Activity** | ✅ Yes (60 seconds) | Access web interface extends wake time |
+| **Scenario** | **OTA Available** | **Duration** |
+|--------------|-------------------|--------------|
+| **Initial Power-On** | ✅ Yes | 5 minutes |
+| **Button Press** | ✅ Yes | Until idle (60s after last activity) |
+| **Deep Sleep Wake** | ❌ No | Device immediately returns to sleep |
 
 **Why this design?**
 - **Battery efficiency**: Deep sleep wakes happen frequently (hourly) for alarm checks - enabling OTA would drain battery
@@ -185,23 +175,17 @@ The ESP32's built-in BOOT button (GPIO0) provides manual sync functionality:
 
 #### Method 1: Power-On Boot (Simplest)
 1. **Power cycle the device** (unplug and replug, or press RST/EN button)
-2. **60-second OTA window** opens automatically
+2. **5-minute OTA window** opens automatically
 3. **Blue LED flashes** every 5 seconds confirm OTA readiness
 4. **Upload firmware** via PlatformIO or Arduino IDE
 5. Device reboots and applies update
 
-#### Method 2: Button Wake (Most Convenient)
+#### Method 2: Button Press (Most Convenient)
 1. **Press BOOT button** (GPIO0) to wake device
-2. **Blue LED flash** confirms device is awake
-3. **OTA remains available** for 5 minutes
+2. **Blue LED flash** confirms device is awake and OTA enabled
+3. **Device stays awake** for 60 seconds after last activity
 4. **Upload firmware** or access web interface
-5. Device stays awake for 60 seconds after last activity
-
-#### Method 3: Web Activity
-1. **Access web interface** at `http://<IP>` or `http://sunrise-alarm.local`
-2. **Device stays awake** for 60 seconds after each page load
-3. **Upload firmware** during this window
-4. Keep refreshing pages to extend wake time if needed
+5. Web activity extends wake time by 60 seconds
 
 ### Visual Status Indicators
 
@@ -244,7 +228,7 @@ pio run -t upload
 | **Hostname** | `sunrise-alarm` | `config.h` → `OTA_HOSTNAME` |
 | **Password** | `sunrise2024` | `config.h` → `OTA_PASSWORD` |
 | **Port** | `3232` | Standard ArduinoOTA port |
-| **Initial Window** | 60 seconds | After power-on only |
+| **Initial Window** | 5 minutes | After power-on only |
 | **Button Wake** | Until idle | Press BOOT to activate |
 
 ### OTA Troubleshooting
@@ -253,7 +237,7 @@ pio run -t upload
 - Device is in deep sleep - **press BOOT button** to wake
 - Check device and computer are on same network
 - Verify IP address hasn't changed (check router or serial monitor)
-- Try power cycling device for fresh 60-second window
+- Try power cycling device for fresh 5-minute window
 
 **"Auth Failed" error:**
 - OTA password mismatch in `config.h`
@@ -264,25 +248,25 @@ pio run -t upload
 - WiFi connection unstable - move closer to router
 - Device went to sleep (button press should prevent this)
 - Try accessing web interface first to keep device awake
-- Power cycle for guaranteed 60-second window
+- Power cycle for guaranteed 5-minute window
 
 **Device immediately sleeps:**
 - Normal behavior after deep sleep alarm checks
 - **Solution**: Press BOOT button before attempting OTA
-- **Alternative**: Power cycle for automatic 60-second window
+- **Alternative**: Power cycle for automatic 5-minute window
 
 ### Development Workflow
 
 **For active development:**
 1. **Keep device awake**: Press BOOT button or keep web interface open
 2. **Web activity extends wake time**: Each page refresh adds 60 seconds
-3. **Serial monitor**: Connect via USB for debugging (doesn't prevent sleep)
-4. **Quick updates**: Power cycle for fast 60-second upload window
+3. **Serial monitor**: Connect via USB for debugging
+4. **Quick updates**: Power cycle for fast 5-minute upload window
 
 **For production use:**
 1. **Device sleeps** between alarms for battery efficiency
 2. **Update on demand**: Press BOOT button when update needed
-3. **Web interface**: Access during OTA window for remote monitoring
+3. **Web interface**: Only available when OTA is active
 4. **No interruption**: Updates only happen when you initiate them
 
 **Best practices:**
@@ -293,11 +277,24 @@ pio run -t upload
 
 ## 📱 Web Interface & Remote Access
 
+### ⚠️ Web Server Availability
+
+**The web interface is ONLY available when:**
+
+| **Scenario** | **Web Server Active** |
+|--------------|----------------------|
+| **Initial Power-On** | ✅ Yes (5 minutes) |
+| **Button Press** | ✅ Yes (until idle) |
+| **During Alarm** | ✅ Yes (during sunrise animation) |
+| **Deep Sleep Wake** | ❌ No |
+
+This design saves power by only running the web server when needed.
+
 ### Accessing the Web Dashboard
 
-Once your ESP32 is connected to WiFi, you can access the web interface:
+Once your ESP32 is awake and the web server is running:
 
-1. **Find the IP address**: Check your router's admin panel or use a network scanner
+1. **Find the IP address**: Check your router's admin panel or serial monitor
 2. **Open browser**: Navigate to `http://<ESP32_IP_ADDRESS>` 
 3. **Alternative**: Use the hostname `http://sunrise-alarm.local` (if mDNS is supported)
 
@@ -312,12 +309,13 @@ Once your ESP32 is connected to WiFi, you can access the web interface:
 
 ### Real-Time Logging
 
-The device provides comprehensive web-based logging:
+The device provides comprehensive web-based logging when server is active:
 
 - **Auto-refresh**: Logs page refreshes every 5 seconds
 - **Persistent storage**: Last 100 log entries retained in memory
 - **Timestamps**: All logs include precise timestamps
 - **Multiple sources**: Boot events, WiFi status, alarm triggers, errors
+- **Activity tracking**: Each page access extends wake time by 60 seconds
 
 **Access logs via**: `http://<ESP32_IP>/logs`
 

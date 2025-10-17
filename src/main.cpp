@@ -194,13 +194,13 @@ void setup()
   }
 
   syncTime();
-  fetchAlarms();
 
   if (buttonPressed)
   {
     handleButtonPress();
   }
 
+  fetchAlarms();
   checkAlarms();
 
   if (!shouldStayAwake())
@@ -253,16 +253,16 @@ void loop()
 {
   ArduinoOTA.handle();
 
+  if (buttonPressed)
+  {
+    handleButtonPress();
+  }
+
   if (!shouldStayAwake())
   {
     WEB_LOG("OTA window expired - preparing for sleep");
     calculateNextWakeTime();
     enterDeepSleep();
-  }
-
-  if (buttonPressed)
-  {
-    handleButtonPress();
   }
 
   static unsigned long lastStatusUpdate = 0;
@@ -280,7 +280,7 @@ void loop()
     {
       reason = "Web activity (expires in " + String((60000 - (millis() - lastWebRequest)) / 1000) + "s)";
     }
-    else if (millis() - bootTime < OTA_WINDOW_DURATION)
+    else if (bootCount == 1 && millis() - bootTime < OTA_WINDOW_DURATION)
     {
       reason = "OTA window (expires in " + String((OTA_WINDOW_DURATION - (millis() - bootTime)) / 1000) + "s)";
     }
@@ -569,7 +569,7 @@ void fetchAlarms()
 
 void parseAlarms(String jsonResponse)
 {
-  DynamicJsonDocument doc(4096); // Allocate 4KB for JSON parsing
+  JsonDocument doc;
   DeserializationError error = deserializeJson(doc, jsonResponse);
 
   if (error)
