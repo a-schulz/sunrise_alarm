@@ -4,19 +4,20 @@
 #include <Arduino.h>
 #include <time.h>
 
-class Logger {
+class Logger
+{
 public:
     static void init(int max_entries);
-    static void log(const String& message);
+    static void log(const String &message);
     static String getLogsHtml();
     static int getLogCount();
-    
+
 private:
-    static String* log_buffer;
+    static String *log_buffer;
     static int log_index;
     static bool buffer_full;
     static int max_entries;
-    
+
     static String getTimestamp();
 };
 

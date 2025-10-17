@@ -16,21 +16,21 @@
 #define COLOR_ORDER GRB
 
 // Button Configuration
-#define BUTTON_PIN 0  // GPIO0 (BOOT button on most ESP32 boards)
+#define BUTTON_PIN 0 // GPIO0 (BOOT button on most ESP32 boards)
 #define BUTTON_DEBOUNCE_MS 50
 
 // NTP Configuration
 #define NTP_SERVER "pool.ntp.org"
-#define GMT_OFFSET_SEC 0        // Adjust for your timezone
+#define GMT_OFFSET_SEC 0         // Adjust for your timezone
 #define DAYLIGHT_OFFSET_SEC 3600 // Adjust for daylight saving
 
 // Power Management
-#define DEEP_SLEEP_DURATION 3600000000ULL  // 1 hour in microseconds
-#define ALARM_CHECK_INTERVAL 60000000ULL   // 1 minute in microseconds
+#define DEEP_SLEEP_DURATION 3600000000ULL // 1 hour in microseconds
+#define ALARM_CHECK_INTERVAL 60000000ULL  // 1 minute in microseconds
 
 // Alarm Configuration
 #define MAX_ALARMS 10
-#define DEFAULT_SUNRISE_DURATION 30  // minutes
+#define DEFAULT_SUNRISE_DURATION 30 // minutes
 #define DEFAULT_BRIGHTNESS 255
 
 // Debug Mode
