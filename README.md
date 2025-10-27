@@ -157,6 +157,13 @@ Create/edit `include/config.h` with your settings:
 #define LED_PIN 4
 #define NUM_LEDS 60
 #define BUTTON_PIN 0  // GPIO0 (BOOT button)
+
+// Timezone Configuration (automatically handles DST)
+// Examples:
+//   Germany/CET: "CET-1CEST,M3.5.0,M10.5.0/3"
+//   US Pacific:  "PST8PDT,M3.2.0,M11.1.0"
+//   UK:          "GMT0BST,M3.5.0/1,M10.5.0"
+#define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 ```
 
 ## 🔄 Over-The-Air (OTA) Updates
@@ -439,6 +446,19 @@ VALUES ('YOUR_ESP32_MAC', '07:00:00', ARRAY[1,2,3,4,5], 255, 30, 'sunrise');
 - Press BOOT button to sync and sleep manually
 - Wait for scheduled alarm to wake device
 - Power cycle for new 5-minute active window
+
+**Incorrect Time or Alarm Not Triggering:**
+
+- Verify timezone configuration in `config.h` matches your location
+- Check NTP server is accessible (default: `pool.ntp.org`)
+- Monitor serial output for "Time synchronized" message
+- Common timezone strings:
+  - Germany/CET: `"CET-1CEST,M3.5.0,M10.5.0/3"`
+  - US Pacific: `"PST8PDT,M3.2.0,M11.1.0"`
+  - US Eastern: `"EST5EDT,M3.2.0,M11.1.0"`
+  - UK: `"GMT0BST,M3.5.0/1,M10.5.0"`
+  - UTC (no DST): `"UTC0"`
+- Daylight Saving Time is handled automatically with proper timezone string
 
 ### Debug Mode
 
