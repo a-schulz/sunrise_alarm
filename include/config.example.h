@@ -21,8 +21,30 @@
 
 // NTP Configuration
 #define NTP_SERVER "pool.ntp.org"
-#define GMT_OFFSET_SEC 0         // Adjust for your timezone
-#define DAYLIGHT_OFFSET_SEC 3600 // Adjust for daylight saving
+
+// Timezone Configuration (POSIX timezone string format)
+// This automatically handles Daylight Saving Time (DST) transitions
+// Examples for common timezones:
+//   Central European Time (CET/CEST - Germany, France, Italy, etc.):
+//     "CET-1CEST,M3.5.0,M10.5.0/3"
+//   Eastern European Time (EET/EEST - Greece, Romania, etc.):
+//     "EET-2EEST,M3.5.0/3,M10.5.0/4"
+//   UTC (no DST):
+//     "UTC0"
+//   US Pacific Time (PST/PDT):
+//     "PST8PDT,M3.2.0,M11.1.0"
+//   US Eastern Time (EST/EDT):
+//     "EST5EDT,M3.2.0,M11.1.0"
+//   UK (GMT/BST):
+//     "GMT0BST,M3.5.0/1,M10.5.0"
+//
+// Format: STD offset DST [,start[/time],end[/time]]
+//   STD = Standard time zone name
+//   offset = Hours offset from UTC (positive is west, negative is east)
+//   DST = Daylight saving time zone name
+//   start = When DST starts (Mm.n.d = month.week.day, M3.5.0 = March, last Sunday)
+//   end = When DST ends
+#define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power Management
 #define DEEP_SLEEP_DURATION 3600000000ULL // 1 hour in microseconds
