@@ -59,9 +59,19 @@
 #define DEFAULT_BRIGHTNESS 255
 
 // Debug Mode
-#define DEBUG_MODE 1
+#define ENABLE_DEBUG_MODE 1
 
-#if DEBUG_MODE
+// OTA Configuration
+#define OTA_HOSTNAME "sunrise-alarm"
+#define OTA_PASSWORD "super strong password"
+#define OTA_PORT 3232
+
+// Web Server Configuration
+#define WEB_SERVER_PORT 80
+#define ENABLE_WEB_LOGS 1
+#define MAX_LOG_ENTRIES 100
+
+#if ENABLE_DEBUG_MODE
 #define DEBUG_PRINT(x) Serial.print(x)
 #define DEBUG_PRINTLN(x) Serial.println(x)
 #else
