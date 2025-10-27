@@ -44,6 +44,7 @@
 //   DST = Daylight saving time zone name
 //   start = When DST starts (Mm.n.d format where m=month, n=week, d=day)
 //           Week 5 means "last occurrence of that weekday in the month"
+//           Day: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
 //           Example: M3.5.0 = Last Sunday (day 0) of March (month 3)
 //   end = When DST ends (same format as start)
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
