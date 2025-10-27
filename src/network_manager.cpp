@@ -89,7 +89,7 @@ void NetworkManager::handle_ota()
 void NetworkManager::sync_time()
 {
     WEB_LOG("Syncing time with NTP server...");
-    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    configTzTime(TIMEZONE, NTP_SERVER);
 
     struct tm timeinfo;
     int attempts = 0;
